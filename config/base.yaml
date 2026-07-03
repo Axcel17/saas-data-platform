@@ -1,0 +1,68 @@
+# Shared defaults for every environment and tenant.
+# Environment files (config/env/<env>.yaml) and tenant files
+# (config/tenants/<tenant>.yaml) are merged on top of this file, in that order.
+
+project: saas-data-platform
+
+# Overridden by each environment file. All layer paths are derived from it so a
+# single override relocates the whole medallion tree for dev / qa / main.
+data_root: data/dev
+
+paths:
+  bronze: ${data_root}/bronze
+  silver: ${data_root}/silver
+  gold: ${data_root}/gold
+  # Base for quarantine tables: <quarantine_root>/<layer>_quarantine/<tenant>/<table>/
+  quarantine_root: ${data_root}
+  # Shared, cross-tenant Delta table with data-quality results.
+  quality_logs: ${data_root}/shared/quality_logs
+  raw:
+    deliveries: data/raw/global_mobility_data_entrega_productos.csv
+    materials: data/raw/materials_catalog.csv
+
+execution:
+  # Range of fecha_proceso to process, inclusive, format YYYY-MM-DD.
+  # null means "no lower/upper bound" (process everything available).
+  start_date: null
+  end_date: null
+  # A single tenant code (lowercase) or "all".
+  tenant: all
+  # When tenant == all and one tenant fails: true aborts the whole run,
+  # false continues with the remaining tenants and reports failures at the end.
+  fail_fast: false
+
+quality:
+  # If a critical check fails, abort before Gold for that tenant.
+  fail_on_critical: false
+
+gold:
+  # Rows kept per (tenant, month) in top_materials_by_tenant_month.
+  top_materials_n: 10
+
+storage:
+  # null  -> local path-based Delta (default, reproducible, no account needed).
+  # "saas_dev" (a Unity Catalog catalog name) -> write UC tables
+  #   <catalog>.<layer>_<tenant>.<table>, mapping the path layout 1:1 to Unity.
+  # Switchable per run with --catalog.
+  catalog: null
+
+spark:
+  app_name: saas_pipeline
+  shuffle_partitions: 8
+
+# Registry of onboarded tenants. Adding a tenant here (plus its config file)
+# is what makes `--tenant all` pick it up.
+tenants:
+  - sv
+  - hn
+  - ec
+  - jm
+  - gt
+  - pe
+
+# Business rules that are policy, not code. Centralised so they can be audited
+# and changed without touching transformation logic.
+business:
+  units_per_case: 20
+  routine_delivery_types: [ZPRE, ZVE1]
+  bonus_delivery_types: [Z04, Z05]

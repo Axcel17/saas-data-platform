@@ -1,0 +1,5 @@
+# Tenant override for Jamaica (jm).
+tenant_profile:
+  id: jm
+  display_name: Jamaica
+  timezone: America/Jamaica

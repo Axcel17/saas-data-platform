@@ -1,0 +1,7 @@
+# Tenant override for El Salvador (sv).
+# Tenant files can override any key; here they carry tenant metadata and, if
+# needed, tenant-specific tuning (e.g. a stricter quality gate for one tenant).
+tenant_profile:
+  id: sv
+  display_name: El Salvador
+  timezone: America/El_Salvador

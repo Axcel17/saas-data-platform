@@ -1,0 +1,5 @@
+# Tenant override for Ecuador (ec).
+tenant_profile:
+  id: ec
+  display_name: Ecuador
+  timezone: America/Guayaquil

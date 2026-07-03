@@ -1,0 +1,5 @@
+# Tenant override for Peru (pe).
+tenant_profile:
+  id: pe
+  display_name: Peru
+  timezone: America/Lima

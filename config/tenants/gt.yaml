@@ -1,0 +1,5 @@
+# Tenant override for Guatemala (gt).
+tenant_profile:
+  id: gt
+  display_name: Guatemala
+  timezone: America/Guatemala

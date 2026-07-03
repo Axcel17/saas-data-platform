@@ -1,0 +1,4 @@
+# QA environment: isolated storage tree under data/qa.
+# In Databricks this maps to the catalog saas_qa.
+env: qa
+data_root: data/qa

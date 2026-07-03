@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# uv
+# uv.lock is committed for reproducibility.
+
+# Generated medallion data (kept out of version control per architecture note).
+# The raw inputs under data/raw/ are the given fixtures and ARE versioned.
+data/dev/
+data/qa/
+data/main/
+
+# Spark
+spark-warehouse/
+metastore_db/
+derby.log
+
+# OS / editor / local tooling
+.DS_Store
+.idea/
+.vscode/
+.claude/

@@ -1,0 +1,5 @@
+# Tenant override for Honduras (hn).
+tenant_profile:
+  id: hn
+  display_name: Honduras
+  timezone: America/Tegucigalpa

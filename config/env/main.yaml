@@ -1,0 +1,10 @@
+# Production environment: isolated storage tree under data/main.
+# In Databricks this maps to the catalog saas_main.
+env: main
+data_root: data/main
+# Production runs abort the whole batch if any tenant fails and enforce
+# critical data-quality gates before Gold.
+execution:
+  fail_fast: true
+quality:
+  fail_on_critical: true
