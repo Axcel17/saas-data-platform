@@ -53,7 +53,8 @@ cfg = load_config(
         "paths.raw.materials": f"{volume}/materials_catalog.csv",
     },
 )
-report = run(cfg)
+# Reuse the notebook's serverless session; the pipeline must not create or stop one.
+report = run(cfg, spark=spark)
 print(report)
 
 # COMMAND ----------

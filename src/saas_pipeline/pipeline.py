@@ -75,8 +75,15 @@ def run_tenant(
         gold.build_gold(spark, cfg, tenant)
 
 
-def run(cfg: DictConfig, layers: tuple[str, ...] = LAYERS) -> RunReport:
-    """Run the pipeline for the tenant(s) selected in the configuration."""
+def run(
+    cfg: DictConfig, layers: tuple[str, ...] = LAYERS, spark: SparkSession | None = None
+) -> RunReport:
+    """Run the pipeline for the tenant(s) selected in the configuration.
+
+    On Databricks, pass the notebook's existing ``spark`` session; it is reused
+    and never stopped. Locally, leave it as None and a session is created and
+    stopped here.
+    """
     run_id = uuid.uuid4().hex
     report = RunReport(run_id=run_id)
 
@@ -85,7 +92,9 @@ def run(cfg: DictConfig, layers: tuple[str, ...] = LAYERS) -> RunReport:
     else:
         tenants = [str(cfg.execution.tenant)]
 
-    spark = get_spark(cfg)
+    owns_spark = spark is None
+    if spark is None:
+        spark = get_spark(cfg)
     try:
         for tenant in tenants:
             try:
@@ -97,7 +106,8 @@ def run(cfg: DictConfig, layers: tuple[str, ...] = LAYERS) -> RunReport:
                 if cfg.execution.fail_fast:
                     raise
     finally:
-        spark.stop()
+        if owns_spark:
+            spark.stop()
 
     if report.failed:
         log.error(

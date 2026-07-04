@@ -31,10 +31,6 @@ def _pin_worker_python() -> None:
     os.environ.setdefault("PYSPARK_DRIVER_PYTHON", sys.executable)
 
 
-def _on_databricks() -> bool:
-    return bool(os.environ.get("DATABRICKS_RUNTIME_VERSION"))
-
-
 def _safe_set(spark: SparkSession, key: str, value: object) -> None:
     """Set a Spark conf, tolerating the ones locked on Databricks serverless."""
     try:
@@ -51,19 +47,24 @@ def get_spark(cfg: DictConfig) -> SparkSession:
     than as a session config, because serverless locks that config.
     """
     _pin_worker_python()
-    builder = SparkSession.builder.appName(cfg.spark.app_name)
 
-    if _on_databricks():
-        spark = builder.getOrCreate()
-    else:
-        builder = builder.config(
-            "spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension"
-        ).config(
+    # On Databricks (classic or serverless) a session already exists; reuse it
+    # instead of building one, which avoids the serverless "no active session"
+    # error and keeps us from stopping a session we do not own.
+    active = SparkSession.getActiveSession()
+    if active is not None:
+        _safe_set(active, "spark.sql.session.timeZone", "UTC")
+        return active
+
+    builder = (
+        SparkSession.builder.appName(cfg.spark.app_name)
+        .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
+        .config(
             "spark.sql.catalog.spark_catalog",
             "org.apache.spark.sql.delta.catalog.DeltaCatalog",
         )
-        spark = configure_spark_with_delta_pip(builder).getOrCreate()
-
+    )
+    spark = configure_spark_with_delta_pip(builder).getOrCreate()
     _safe_set(spark, "spark.sql.session.timeZone", "UTC")
     _safe_set(spark, "spark.sql.shuffle.partitions", int(cfg.spark.shuffle_partitions))
     return spark
