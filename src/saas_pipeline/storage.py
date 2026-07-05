@@ -49,7 +49,10 @@ def overwrite(
 ) -> None:
     writer = df.write.format("delta").mode("overwrite")
     if partition_by:
-        writer = writer.partitionBy(partition_by)
+        # Dynamic partition overwrite as a write option (portable to serverless,
+        # which locks the equivalent session config): only the partitions present
+        # in the batch are replaced, keeping reprocessing idempotent.
+        writer = writer.partitionBy(partition_by).option("partitionOverwriteMode", "dynamic")
     _save(spark, loc, writer)
 
 

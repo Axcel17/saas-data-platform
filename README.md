@@ -67,6 +67,7 @@ saas-data-platform/
 │   └── cli.py              # entrypoint de línea de comandos
 ├── tests/                  # suite pytest (transforms, quality, gold, config)
 ├── mentoring/              # ejercicio de code review
+├── databricks/             # notebook + setup SQL para correr en Unity Catalog
 ├── docs/                   # observations, infra, databricks, onboarding
 ├── data/raw/               # CSVs de entrada (versionados)
 ├── .github/workflows/ci.yml

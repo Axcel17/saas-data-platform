@@ -47,11 +47,13 @@ def normalize_tenant(df: DataFrame) -> DataFrame:
 def parsed_fecha_column() -> Column:
     """Parse ``fecha_proceso`` (string YYYYMMDD) into a valid ``date`` or null.
 
-    Spark's ``to_date`` with strict-ish parsing returns null for values such as
-    ``00000000`` and ``20251332``, which is exactly the signal used to route
-    date anomalies to quarantine.
+    ``try_to_timestamp`` returns null for unparseable or impossible values such
+    as ``00000000``, ``20251332`` or ``20250230`` (Feb 30), the signal used to
+    route date anomalies to quarantine. Unlike ``to_date`` it returns null
+    instead of raising under ANSI mode (Databricks default), so the same code
+    behaves identically on local Spark and on Databricks.
     """
-    return F.to_date(F.col("fecha_proceso"), "yyyyMMdd")
+    return F.expr("to_date(try_to_timestamp(fecha_proceso, 'yyyyMMdd'))")
 
 
 def _numeric(col_name: str) -> Column:

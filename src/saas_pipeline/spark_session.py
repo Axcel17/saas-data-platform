@@ -15,6 +15,10 @@ from delta import configure_spark_with_delta_pip
 from omegaconf import DictConfig
 from pyspark.sql import SparkSession
 
+from saas_pipeline.logging_config import get_logger
+
+log = get_logger(__name__)
+
 
 def _pin_worker_python() -> None:
     """Ensure Spark workers use the same interpreter as the driver.
@@ -27,33 +31,40 @@ def _pin_worker_python() -> None:
     os.environ.setdefault("PYSPARK_DRIVER_PYTHON", sys.executable)
 
 
-def _on_databricks() -> bool:
-    return bool(os.environ.get("DATABRICKS_RUNTIME_VERSION"))
+def _safe_set(spark: SparkSession, key: str, value: object) -> None:
+    """Set a Spark conf, tolerating the ones locked on Databricks serverless."""
+    try:
+        spark.conf.set(key, value)
+    except Exception as exc:  # noqa: BLE001 - serverless locks some configs
+        log.debug("Skipping locked Spark conf %s: %s", key, exc)
 
 
 def get_spark(cfg: DictConfig) -> SparkSession:
     """Return a Delta-enabled Spark session.
 
-    Time zone is pinned to UTC so technical timestamps are unambiguous, and
-    dynamic partition overwrite is enabled so Bronze/Gold writes replace only
-    the partitions present in the batch (idempotent reprocessing).
+    Time zone is pinned to UTC so technical timestamps are unambiguous. Dynamic
+    partition overwrite is applied per write (see ``storage.overwrite``) rather
+    than as a session config, because serverless locks that config.
     """
     _pin_worker_python()
-    builder = SparkSession.builder.appName(cfg.spark.app_name)
 
-    if _on_databricks():
-        spark = builder.getOrCreate()
-    else:
-        builder = builder.config(
-            "spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension"
-        ).config(
+    # On Databricks (classic or serverless) a session already exists; reuse it
+    # instead of building one, which avoids the serverless "no active session"
+    # error and keeps us from stopping a session we do not own.
+    active = SparkSession.getActiveSession()
+    if active is not None:
+        _safe_set(active, "spark.sql.session.timeZone", "UTC")
+        return active
+
+    builder = (
+        SparkSession.builder.appName(cfg.spark.app_name)
+        .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
+        .config(
             "spark.sql.catalog.spark_catalog",
             "org.apache.spark.sql.delta.catalog.DeltaCatalog",
         )
-        spark = configure_spark_with_delta_pip(builder).getOrCreate()
-
-    # Runtime configs, settable on both local and Databricks sessions.
-    spark.conf.set("spark.sql.session.timeZone", "UTC")
-    spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")
-    spark.conf.set("spark.sql.shuffle.partitions", int(cfg.spark.shuffle_partitions))
+    )
+    spark = configure_spark_with_delta_pip(builder).getOrCreate()
+    _safe_set(spark, "spark.sql.session.timeZone", "UTC")
+    _safe_set(spark, "spark.sql.shuffle.partitions", int(cfg.spark.shuffle_partitions))
     return spark

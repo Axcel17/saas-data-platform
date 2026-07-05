@@ -1,56 +1,70 @@
 # Ejecución en Databricks (Unity Catalog)
 
-El mismo código corre local (paths, por defecto) o sobre Databricks escribiendo
+El mismo código corre local (paths, por defecto) o en Databricks escribiendo
 tablas Unity Catalog. Es un cambio de configuración: al setear `storage.catalog`
-(o `--catalog`), cada tabla se materializa como `<catalog>.<layer>_<tenant>.<table>`
-en vez de un path local. Esto implementa el mapeo que la arquitectura anticipa
-en la sección 5.2, con los mismos nombres lógicos.
+(o `--catalog`), cada tabla se materializa como `<catalog>.<layer>_<tenant>.<table>`,
+con los mismos nombres lógicos que describe la arquitectura en la sección 5.2.
 
-Es un modo opcional. El artefacto principal y probado es el local (ver README).
-Este modo lo valido en Databricks Free Edition, que ya incluye Unity Catalog.
+Este modo corre todo el Spark **dentro** de Databricks (no Spark Connect), así
+que el MERGE de `DeltaTable` funciona igual que en local. Se valida en Databricks
+Free Edition, que ya incluye Unity Catalog serverless.
 
-## Prerrequisitos
+## 1. Autenticación (opcional, con el CLI)
 
-1. Un catálogo creado en Unity Catalog, por ejemplo `saas_dev`:
-   ```sql
-   CREATE CATALOG IF NOT EXISTS saas_dev;
-   ```
-   Los schemas por tenant (`bronze_sv`, `silver_sv`, `gold_sv`, ...) y el schema
-   `shared` los crea el pipeline solo.
+Correr en el workspace por la UI no requiere el CLI. Si lo querés para
+scripting, es el CLI nuevo (binario, **no** el paquete pip viejo):
 
-2. Un Volume con los CSVs de entrada. En serverless no hay filesystem local, así
-   que los inputs van a un UC Volume:
-   ```sql
-   CREATE SCHEMA IF NOT EXISTS saas_dev.raw;
-   CREATE VOLUME IF NOT EXISTS saas_dev.raw.files;
-   ```
-   Subir `global_mobility_data_entrega_productos.csv` y `materials_catalog.csv` a
-   `/Volumes/saas_dev/raw/files/`.
+```bash
+brew tap databricks/tap && brew install databricks
+databricks auth login --host https://<tu-workspace>.cloud.databricks.com
+```
 
-3. El repo disponible en el workspace como Git folder (Repos), para importar el
-   paquete `saas_pipeline`.
+## 2. Setup de Unity Catalog
 
-## Ejecutar
+Ejecutar [`databricks/setup.sql`](../databricks/setup.sql) en un notebook SQL.
+Crea el catálogo `saas_dev`, el schema `raw` y el volume `raw.files`. Después,
+subir a `/Volumes/saas_dev/raw/files/` (Catalog Explorer > Volume > Upload):
 
-Desde un notebook, apuntando `sys.path` al `src/` del repo y pasando los overrides:
+- `global_mobility_data_entrega_productos.csv`
+- `materials_catalog.csv`
+
+Los schemas por tenant (`bronze_sv`, `silver_sv`, `gold_sv`, ...) y `shared` los
+crea el pipeline solo.
+
+## 3. Agregar el repo como Git folder
+
+En el workspace: **Workspace > Repos > Add Repo** y pegar la URL del repo
+público. Eso deja el paquete `saas_pipeline` disponible sin instalar un wheel
+(la config se lee desde el árbol de fuentes).
+
+## 4. Correr el pipeline
+
+Abrir [`databricks/run_pipeline.py`](../databricks/run_pipeline.py) como notebook
+y ejecutarlo. El notebook:
+
+- Instala `omegaconf` (única dependencia que el runtime no trae).
+- Deriva la ruta del repo desde su propia ubicación (sin usuarios hardcodeados).
+- Toma catálogo, ambiente, tenant y volume desde widgets.
+- Corre `saas_pipeline.pipeline.run` contra Unity Catalog.
+
+Equivalente en una celda suelta:
 
 ```python
 import sys
-sys.path.append("/Workspace/Repos/<tu-usuario>/saas-data-platform/src")
+sys.path.insert(0, "/Workspace/Repos/<tu-usuario>/saas-data-platform/src")
 
 from saas_pipeline.config import load_config
 from saas_pipeline.pipeline import run
 
-cfg = load_config(env="dev", overrides={
+run(load_config(env="dev", overrides={
     "storage.catalog": "saas_dev",
     "execution.tenant": "all",
     "paths.raw.deliveries": "/Volumes/saas_dev/raw/files/global_mobility_data_entrega_productos.csv",
     "paths.raw.materials":  "/Volumes/saas_dev/raw/files/materials_catalog.csv",
-})
-run(cfg)
+}))
 ```
 
-## Verificar
+## 5. Verificar
 
 ```sql
 SHOW SCHEMAS IN saas_dev;                       -- bronze_sv, silver_sv, gold_sv, shared, ...

@@ -1,4 +1,4 @@
-# Reproducible entry points. `uv` manages the Python 3.11 venv and locks deps.
+# Reproducible entry points. `uv` manages the Python 3.12 venv and locks deps.
 # Java 17 (OpenJDK) must be on PATH for local Spark; see README.
 
 .DEFAULT_GOAL := help
