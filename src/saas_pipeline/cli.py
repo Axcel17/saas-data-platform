@@ -12,10 +12,7 @@ import argparse
 import sys
 
 from saas_pipeline.config import load_config
-from saas_pipeline.logging_config import get_logger
 from saas_pipeline.pipeline import LAYERS, run
-
-log = get_logger(__name__)
 
 
 def build_parser() -> argparse.ArgumentParser:
